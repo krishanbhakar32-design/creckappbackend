@@ -47,6 +47,14 @@ const testSchema = new mongoose.Schema({
     type: Number,
     required: true, // sectional tests ke liye yeh 15 rahega (jaisa decide hua)
   },
+  scheduledAt: {
+    type: Date, // agar future date hai to test tab tak "upcoming" rahega, attempt nahi hoga
+    default: null,
+  },
+  isLive: {
+    type: Boolean, // true tabhi hoga jab scheduledAt time aa jaye (ya scheduling hi na ho)
+    default: true,
+  },
   questions: [questionSchema], // upar wala structure yahan array ki tarah use hoga
   createdAt: {
     type: Date,
