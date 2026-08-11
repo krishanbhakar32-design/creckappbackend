@@ -64,6 +64,15 @@ exports.getTestById = async (req, res) => {
   try {
     const test = await Test.findById(req.params.id).select('-questions.correctAnswerIndex -questions.explanation');
     if (!test) return res.status(404).json({ message: 'Test nahi mila' });
+
+    // Agar test schedule hua hai aur abhi time nahi aaya, to attempt block karo
+    if (test.scheduledAt && new Date(test.scheduledAt) > new Date()) {
+      return res.status(403).json({
+        message: 'Yeh test abhi live nahi hua hai',
+        scheduledAt: test.scheduledAt,
+      });
+    }
+
     res.json(test);
   } catch (error) {
     res.status(500).json({ message: 'Error aayi', error: error.message });
