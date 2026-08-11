@@ -7,7 +7,27 @@ const connectDB = require('./config/db');
 const app = express();
 
 // Middleware setup
-app.use(cors()); // frontend se requests aane dega (alag domain se bhi)
+// Frontend (Vercel) se requests allow karne ke liye CORS setup
+// FRONTEND_URL env var mein apna live frontend URL daalo (jaise https://mockpulse.vercel.app)
+// Comma se multiple URLs bhi daal sakte ho (local dev + live dono)
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map((url) => url.trim())
+  : ['http://localhost:5173'];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Postman jaise tools ya server-to-server calls mein origin nahi hota, unhe allow kar do
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      console.log('❌ CORS blocked origin:', origin, '| Allowed:', allowedOrigins);
+      return callback(new Error('CORS policy: is origin ko allow nahi kiya gaya'));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json()); // JSON data samajhne ke liye
 
 // Database se connect karo
