@@ -69,3 +69,32 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Kuch galat ho gaya', error: error.message });
   }
 };
+
+// Kisi existing user ko admin banane ke liye (ek baar use karne wala secret route)
+// GET /api/auth/make-admin?email=xyz@gmail.com&secret=ADMIN_SECRET
+exports.makeAdmin = async (req, res) => {
+  try {
+    const { email, secret } = req.query;
+
+    // Security: sirf wahi banaye admin jo ADMIN_SECRET jaanta ho (.env mein set karo)
+    if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
+      return res.status(403).json({ message: 'Galat secret key' });
+    }
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email query param zaroori hai' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'Is email se koi user register nahi hai. Pehle register karo.' });
+    }
+
+    user.role = 'admin';
+    await user.save();
+
+    res.json({ message: `✅ ${email} ab admin ban gaya!` });
+  } catch (error) {
+    res.status(500).json({ message: 'Kuch galat ho gaya', error: error.message });
+  }
+};
