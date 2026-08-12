@@ -23,15 +23,19 @@ Rules:
 - Sirf ek hi sahi answer ho
 - Har question ke saath ek chhota explanation do ki sahi jawab kyu sahi hai
 - Numerical questions mein calculation double-check karna, galti nahi honi chahiye
+- HAR question, options aur explanation dono English AUR Hindi mein do (jaisa asli SSC/Banking/Railway exams mein bilingual papers hote hain). Hindi translation natural aur exam-appropriate honi chahiye, word-by-word literal nahi.
 - Sirf valid JSON return karo, koi extra text nahi, koi markdown formatting nahi (no \`\`\`)
 
 Response EXACTLY is JSON format mein do:
 [
   {
-    "questionText": "question yaha",
+    "questionText": "question in English",
+    "questionTextHi": "question ka Hindi translation",
     "options": ["option A", "option B", "option C", "option D"],
+    "optionsHi": ["option A Hindi", "option B Hindi", "option C Hindi", "option D Hindi"],
     "correctAnswerIndex": 0,
-    "explanation": "explanation yaha"
+    "explanation": "explanation in English",
+    "explanationHi": "explanation ka Hindi translation"
   }
 ]`;
 
@@ -71,15 +75,19 @@ Rules:
 - Har question ke 4 options hone chahiye, sirf ek hi sahi answer ho
 - Har question ke saath ek chhota explanation do
 - Numerical questions mein calculation double-check karna
+- HAR question, options aur explanation dono English AUR Hindi mein do (jaisa asli bilingual exam papers hote hain). Hindi translation natural honi chahiye.
 - Sirf valid JSON return karo, koi extra text nahi, koi markdown formatting nahi (no \`\`\`)
 
 Response EXACTLY is JSON format mein do (ek single flat array, sections ke order mein questions):
 [
   {
-    "questionText": "question yaha",
+    "questionText": "question in English",
+    "questionTextHi": "question ka Hindi translation",
     "options": ["option A", "option B", "option C", "option D"],
+    "optionsHi": ["option A Hindi", "option B Hindi", "option C Hindi", "option D Hindi"],
     "correctAnswerIndex": 0,
-    "explanation": "explanation yaha",
+    "explanation": "explanation in English",
+    "explanationHi": "explanation ka Hindi translation",
     "sectionName": "us section ka naam jisse ye question belong karta hai"
   }
 ]`;
