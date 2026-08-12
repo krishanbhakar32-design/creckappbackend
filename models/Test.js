@@ -47,9 +47,23 @@ const testSchema = new mongoose.Schema({
     type: String, // jaise "Percentage", "Time & Work" - topic-wise/chapter-wise tests ke liye
     default: '',
   },
+  // Full-mock tests mein har section (jaise Maths, Reasoning) ka apna alag locked time hota hai
+  // (jaisa asli SSC CGL exam mein hota hai). Sectional/topic-wise tests iska use nahi karte,
+  // unke liye seedha durationMinutes hi poore test ka time hai.
+  sections: {
+    type: [
+      {
+        name: { type: String, required: true }, // jaise "Quantitative Aptitude"
+        durationMinutes: { type: Number, required: true }, // is section ka locked time
+        questionStartIndex: { type: Number, required: true }, // questions array mein kaha se shuru
+        questionEndIndex: { type: Number, required: true }, // kaha khatam (exclusive)
+      },
+    ],
+    default: [],
+  },
   durationMinutes: {
     type: Number,
-    required: true, // sectional tests ke liye yeh 15 rahega (jaisa decide hua)
+    required: true, // sectional tests ke liye yeh 15 rahega (jaisa decide hua); full-mock+sections ke liye yeh sabhi section durations ka total hoga
   },
   scheduledAt: {
     type: Date, // agar future date hai to test tab tak "upcoming" rahega, attempt nahi hoga
