@@ -10,7 +10,10 @@ const {
   getTestById,
   submitTest,
   getTestSummary,
+  getExamPatterns,
 } = require('../controllers/testController');
+
+router.get('/patterns', getExamPatterns); // Real exam patterns (SSC/Banking/Railway ke sections/timing/marking)
 
 // Admin-only routes (sirf tum use kar paoge, login ke saath admin role chahiye)
 router.post('/generate', protect, adminOnly, generateTest); // AI se test banwana (review ke liye)
