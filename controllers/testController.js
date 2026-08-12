@@ -42,14 +42,39 @@ exports.publishTest = async (req, res) => {
   }
 };
 
+// USER: Navigation pages ke liye counts nikalna
+// Jaise "SSC ke andar kitne Sectional test hain", "Maths subject ke andar kitne topic-wise test hain" waghera
+exports.getTestSummary = async (req, res) => {
+  try {
+    const summary = await Test.aggregate([
+      {
+        $group: {
+          _id: {
+            examCategory: '$examCategory',
+            testType: '$testType',
+            subject: '$subject',
+            topic: '$topic',
+          },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    res.json(summary);
+  } catch (error) {
+    res.status(500).json({ message: 'Error aayi', error: error.message });
+  }
+};
+
 // USER: Sab tests ki list dekhna (filter ke saath)
 exports.getTests = async (req, res) => {
   try {
-    const { examCategory, testType, subject } = req.query;
+    const { examCategory, subCategory, testType, subject, topic } = req.query;
     const filter = {};
     if (examCategory) filter.examCategory = examCategory;
+    if (subCategory) filter.subCategory = subCategory;
     if (testType) filter.testType = testType;
     if (subject) filter.subject = subject;
+    if (topic) filter.topic = topic;
 
     // List mein questions ka full data nahi bhejte (bahut bada hota hai), sirf basic info
     const tests = await Test.find(filter).select('-questions.correctAnswerIndex -questions.explanation');
