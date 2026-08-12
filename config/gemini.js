@@ -50,17 +50,73 @@ Response EXACTLY is JSON format mein do:
   }
 }
 
-// Yeh function Gemini se detailed study notes (PDF ke liye content) generate karwata hai
-async function generateStudyNotes({ examCategory, subject, topic }) {
-  const prompt = `Tum ek expert teacher ho ${examCategory} competitive exam preparation ke liye.
+// Yeh function poora Full-Length Mock Test banata hai (jaise SSC CGL Tier 1: 4 sections,
+// har section ka apna alag locked time). Ek hi call mein saare sections ke questions milte hain.
+async function generateFullMockTest({ examCategory, subCategory, sections, difficulty }) {
+  // sections = [{ name: 'Quantitative Aptitude', numQuestions: 25, durationMinutes: 15 }, ...]
+  const sectionsList = sections
+    .map((s, i) => `${i + 1}. ${s.name} — ${s.numQuestions} questions`)
+    .join('\n');
 
-Mujhe "${topic}" (${subject} subject ke andar) is topic pe detailed study notes chahiye, jo PDF banane ke liye use honge.
+  const prompt = `Tum ek expert exam content creator ho ${examCategory}${subCategory ? ' ' + subCategory : ''} competitive exam ke liye.
+
+Mujhe ek COMPLETE full-length mock test chahiye, jisme ye sections hon (isi order mein):
+${sectionsList}
+
+Difficulty level: ${difficulty || 'medium'}.
 
 Rules:
-- Notes clear headings aur sub-headings mein organize hone chahiye
-- Important formulas/rules highlight karo agar applicable ho
-- Kam se kam 2-3 solved examples do
-- Simple, exam-focused language use karo (bahut lamba-chauda theory nahi, exam ke liye jo zaroori hai wahi)
+- Har section ke exact utne hi questions banao jitne bataye gaye hain, sections isi order mein hone chahiye
+- Har question exact ${examCategory} exam pattern jaisa hona chahiye, us section ke subject se related
+- Har question ke 4 options hone chahiye, sirf ek hi sahi answer ho
+- Har question ke saath ek chhota explanation do
+- Numerical questions mein calculation double-check karna
+- Sirf valid JSON return karo, koi extra text nahi, koi markdown formatting nahi (no \`\`\`)
+
+Response EXACTLY is JSON format mein do (ek single flat array, sections ke order mein questions):
+[
+  {
+    "questionText": "question yaha",
+    "options": ["option A", "option B", "option C", "option D"],
+    "correctAnswerIndex": 0,
+    "explanation": "explanation yaha",
+    "sectionName": "us section ka naam jisse ye question belong karta hai"
+  }
+]`;
+
+  const result = await ai.models.generateContent({
+    model: 'gemini-3.1-flash-lite',
+    contents: prompt,
+  });
+  const responseText = result.text;
+  const cleanedText = cleanJson(responseText);
+
+  try {
+    const questions = JSON.parse(cleanedText);
+    return questions;
+  } catch (error) {
+    throw new Error('AI response ko samajhne mein error aayi, dubara try karo');
+  }
+}
+
+// Yeh function Gemini se detailed study notes (PDF ke liye content) generate karwata hai
+async function generateStudyNotes({ examCategory, subject, topic }) {
+  const prompt = `Tum ek expert teacher ho ${examCategory} competitive exam preparation ke liye, jinhe pichle 10 saal ka exam pattern pata hai.
+
+Mujhe "${topic}" (${subject} subject ke andar) is topic pe COMPLETE, EXAM-READY study notes chahiye, jo ek professional PDF banane ke liye use honge.
+
+Structure follow karo:
+1. Ek chhota intro paragraph (topic kyu important hai exam ke liye)
+2. Core concept/theory (clear, simple language mein)
+3. Important formulas/rules (agar applicable ho) — bullet points mein
+4. Kam se kam 3 solved examples, step-by-step solution ke saath
+5. Common mistakes jo students karte hain
+6. 5 practice questions (bina answer ke, sirf practice ke liye) end mein
+
+Rules:
+- Exam-focused rakho, bahut lamba-chauda generic theory nahi
+- Har section clear heading ke saath ho
+- Formulas ko clearly highlight karo text mein (jaise "Formula: ...")
 - Sirf valid JSON return karo, koi extra text nahi, koi markdown formatting nahi (no \`\`\`)
 
 Response EXACTLY is JSON format mein do:
@@ -69,7 +125,7 @@ Response EXACTLY is JSON format mein do:
   "sections": [
     {
       "heading": "Section ka naam",
-      "content": "Section ka detailed content yaha (plain text, paragraphs ke liye \\n\\n use karo)"
+      "content": "Section ka detailed content yaha (plain text, paragraphs ke liye \\n\\n use karo, bullet points ke liye \\n- use karo)"
     }
   ]
 }`;
@@ -104,4 +160,4 @@ Simple, clear aur exam-focused jawab do. Agar calculation hai to step by step sa
   return result.text;
 }
 
-module.exports = { generateTestQuestions, generateStudyNotes, solveDoubt };
+module.exports = { generateTestQuestions, generateFullMockTest, generateStudyNotes, solveDoubt };
