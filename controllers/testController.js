@@ -2,11 +2,29 @@
 const Test = require('../models/Test');
 const TestAttempt = require('../models/TestAttempt');
 const { generateTestQuestions, generateFullMockTest } = require('../config/gemini');
+const examPatterns = require('../config/examPatterns');
+
+// PUBLIC/ADMIN: Real exam patterns (SSC/Banking/Railway ke official section/timing/marking) bhejna
+exports.getExamPatterns = (req, res) => {
+  res.json(examPatterns);
+};
 
 // ADMIN: AI se naya test generate karna (sirf review ke liye, abhi publish nahi hota)
 exports.generateTest = async (req, res) => {
   try {
-    const { title, examCategory, subCategory, testType, subject, topic, numQuestions, durationMinutes, difficulty } = req.body;
+    const {
+      title,
+      examCategory,
+      subCategory,
+      testType,
+      subject,
+      topic,
+      numQuestions,
+      durationMinutes,
+      difficulty,
+      correctMarks,
+      negativeMarks,
+    } = req.body;
 
     // Gemini AI ko call karo questions banane ke liye
     const questions = await generateTestQuestions({
@@ -25,6 +43,8 @@ exports.generateTest = async (req, res) => {
       testType,
       subject,
       durationMinutes: durationMinutes || 15, // sectional tests ke liye default 15 min
+      correctMarks: correctMarks || 1,
+      negativeMarks: negativeMarks !== undefined ? negativeMarks : 0.25,
       questions,
     });
   } catch (error) {
@@ -35,7 +55,7 @@ exports.generateTest = async (req, res) => {
 // ADMIN: Full-length mock test generate karna, jisme multiple sections ho (har section ka apna locked time)
 exports.generateFullMock = async (req, res) => {
   try {
-    const { title, examCategory, subCategory, sections, difficulty } = req.body;
+    const { title, examCategory, subCategory, sections, difficulty, correctMarks, negativeMarks } = req.body;
     // sections = [{ name: 'Quantitative Aptitude', numQuestions: 25, durationMinutes: 15 }, ...]
 
     if (!sections || sections.length === 0) {
@@ -69,6 +89,8 @@ exports.generateFullMock = async (req, res) => {
       testType: 'full-mock',
       sections: sectionsWithIndex,
       durationMinutes: totalDuration,
+      correctMarks: correctMarks || 1,
+      negativeMarks: negativeMarks !== undefined ? negativeMarks : 0.25,
       questions: flatQuestions,
     });
   } catch (error) {
@@ -170,7 +192,11 @@ exports.submitTest = async (req, res) => {
       }
     });
 
-    const score = correctCount; // simple scoring: 1 mark per correct (negative marking baad me add kar sakte hain)
+    // Real exam jaisa scoring: sahi jawab ke marks, galat jawab pe negative marking
+    // (test.correctMarks aur test.negativeMarks se aata hai, jo exam pattern se set hote hain)
+    const correctMarks = test.correctMarks || 1;
+    const negativeMarks = test.negativeMarks || 0;
+    const score = Number((correctCount * correctMarks - wrongCount * negativeMarks).toFixed(2));
 
     const attempt = await TestAttempt.create({
       user: req.user.id,
