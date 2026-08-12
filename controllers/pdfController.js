@@ -20,7 +20,7 @@ exports.publishNotes = async (req, res) => {
     const { examCategory, subject, topic, notes } = req.body;
 
     const filename = `${topic.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
-    const fileUrl = await createPdfFromNotes(notes, filename);
+    const fileUrl = await createPdfFromNotes(notes, filename, { examCategory, subject, topic });
 
     const studyPdf = await StudyPdf.create({
       title: notes.title,
