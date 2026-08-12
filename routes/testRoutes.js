@@ -8,6 +8,7 @@ const {
   getTests,
   getTestById,
   submitTest,
+  getTestSummary,
 } = require('../controllers/testController');
 
 // Admin-only routes (sirf tum use kar paoge, login ke saath admin role chahiye)
@@ -15,6 +16,7 @@ router.post('/generate', protect, adminOnly, generateTest); // AI se test banwan
 router.post('/publish', protect, adminOnly, publishTest); // Review ke baad publish karna
 
 // User routes (koi bhi logged-in user use kar sakta hai)
+router.get('/summary', getTestSummary); // Har category/type/subject ke count nikalna (navigation pages ke liye)
 router.get('/', getTests); // Sab tests dekhna (login zaroori nahi, public list)
 router.get('/:id', getTestById); // Ek test kholna attempt karne ke liye
 router.post('/submit', protect, submitTest); // Test submit karna (login zaroori hai, taaki history save ho)
