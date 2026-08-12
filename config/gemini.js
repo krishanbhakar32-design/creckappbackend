@@ -36,7 +36,7 @@ Response EXACTLY is JSON format mein do:
 ]`;
 
   const result = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.1-flash-lite',
     contents: prompt,
   });
   const responseText = result.text;
@@ -75,7 +75,7 @@ Response EXACTLY is JSON format mein do:
 }`;
 
   const result = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.1-flash-lite',
     contents: prompt,
   });
   const responseText = result.text;
@@ -98,7 +98,7 @@ Student ka sawal: "${userQuestion}"
 Simple, clear aur exam-focused jawab do. Agar calculation hai to step by step samjhao. Zyada lamba mat likhna, seedha point pe aao.`;
 
   const result = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-lite',
+    model: 'gemini-3.1-flash-lite',
     contents: prompt,
   });
   return result.text;
