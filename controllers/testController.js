@@ -1,7 +1,7 @@
 // Yeh file test se related sab logic handle karti hai
 const Test = require('../models/Test');
 const TestAttempt = require('../models/TestAttempt');
-const { generateTestQuestions } = require('../config/gemini');
+const { generateTestQuestions, generateFullMockTest } = require('../config/gemini');
 
 // ADMIN: AI se naya test generate karna (sirf review ke liye, abhi publish nahi hota)
 exports.generateTest = async (req, res) => {
@@ -29,6 +29,50 @@ exports.generateTest = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Test generate karne mein error aayi', error: error.message });
+  }
+};
+
+// ADMIN: Full-length mock test generate karna, jisme multiple sections ho (har section ka apna locked time)
+exports.generateFullMock = async (req, res) => {
+  try {
+    const { title, examCategory, subCategory, sections, difficulty } = req.body;
+    // sections = [{ name: 'Quantitative Aptitude', numQuestions: 25, durationMinutes: 15 }, ...]
+
+    if (!sections || sections.length === 0) {
+      return res.status(400).json({ message: 'Kam se kam ek section chahiye' });
+    }
+
+    const flatQuestions = await generateFullMockTest({ examCategory, subCategory, sections, difficulty });
+
+    // Ab sections ka questionStartIndex/questionEndIndex nikalte hain based on how many
+    // questions Gemini ne actually har section ke liye banaye (sectionName field se match karke)
+    let cursor = 0;
+    const sectionsWithIndex = sections.map((s) => {
+      const sectionQuestions = flatQuestions.filter((q) => q.sectionName === s.name);
+      const startIndex = cursor;
+      const endIndex = cursor + sectionQuestions.length;
+      cursor = endIndex;
+      return {
+        name: s.name,
+        durationMinutes: s.durationMinutes,
+        questionStartIndex: startIndex,
+        questionEndIndex: endIndex,
+      };
+    });
+
+    const totalDuration = sections.reduce((sum, s) => sum + s.durationMinutes, 0);
+
+    res.json({
+      title,
+      examCategory,
+      subCategory,
+      testType: 'full-mock',
+      sections: sectionsWithIndex,
+      durationMinutes: totalDuration,
+      questions: flatQuestions,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Full mock test generate karne mein error aayi', error: error.message });
   }
 };
 
