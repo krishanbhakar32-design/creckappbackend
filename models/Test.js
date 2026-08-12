@@ -43,6 +43,10 @@ const testSchema = new mongoose.Schema({
     type: String, // jaise "Maths", "Reasoning", "English", "GK" - sectional/topic-wise ke liye
     default: '',
   },
+  topic: {
+    type: String, // jaise "Percentage", "Time & Work" - topic-wise/chapter-wise tests ke liye
+    default: '',
+  },
   durationMinutes: {
     type: Number,
     required: true, // sectional tests ke liye yeh 15 rahega (jaisa decide hua)
