@@ -7,9 +7,17 @@ const questionSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  questionTextHi: {
+    type: String, // Hindi translation, test ke andar language-toggle ke liye
+    default: '',
+  },
   options: {
     type: [String], // 4 options ka array, jaise ["Option A", "Option B", "Option C", "Option D"]
     required: true,
+  },
+  optionsHi: {
+    type: [String], // options ka Hindi translation
+    default: [],
   },
   correctAnswerIndex: {
     type: Number, // 0, 1, 2, ya 3 - options array mein sahi jawab ka position
@@ -17,6 +25,14 @@ const questionSchema = new mongoose.Schema({
   },
   explanation: {
     type: String, // sahi jawab kyu sahi hai, uski detail
+    default: '',
+  },
+  explanationHi: {
+    type: String, // explanation ka Hindi translation
+    default: '',
+  },
+  sectionName: {
+    type: String, // full-mock tests mein yeh question kis section ka hai
     default: '',
   },
 });
@@ -64,6 +80,15 @@ const testSchema = new mongoose.Schema({
   durationMinutes: {
     type: Number,
     required: true, // sectional tests ke liye yeh 15 rahega (jaisa decide hua); full-mock+sections ke liye yeh sabhi section durations ka total hoga
+  },
+  // Marking scheme - real exam ke pattern ke hisaab se (jaise SSC: +2/-0.5, IBPS: +1/-0.25, Railway: +1/-0.33)
+  correctMarks: {
+    type: Number,
+    default: 1,
+  },
+  negativeMarks: {
+    type: Number,
+    default: 0.25,
   },
   scheduledAt: {
     type: Date, // agar future date hai to test tab tak "upcoming" rahega, attempt nahi hoga
