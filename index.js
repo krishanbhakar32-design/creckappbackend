@@ -46,6 +46,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/tests', require('./routes/testRoutes'));
 app.use('/api/pdfs', require('./routes/pdfRoutes'));
 app.use('/api/doubt', require('./routes/doubtRoutes'));
+app.use('/api/reports', require('./routes/reportRoutes'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
