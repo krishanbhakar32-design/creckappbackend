@@ -1,13 +1,17 @@
 // Yeh file Gemini AI se baat karti hai aur usse questions generate karwati hai
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+// NOTE: Purana package '@google/generative-ai' Google ne 31 Aug 2025 ko band kar diya (EOL).
+// Ab hum naya official SDK '@google/genai' use karte hain.
+const { GoogleGenAI } = require('@google/genai');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+// Gemini kabhi kabhi ```json ke andar wrap karke response bhejta hai, usse clean karte hain
+function cleanJson(text) {
+  return text.replace(/```json|```/g, '').trim();
+}
 
 // Yeh function Gemini ko command bhejta hai aur MCQ questions banwata hai
 async function generateTestQuestions({ examCategory, subject, topic, numQuestions, difficulty }) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-  // Yeh prompt sabse important hai - jitna clear instruction, utna accurate result
   const prompt = `Tum ek expert exam content creator ho ${examCategory} competitive exam ke liye.
 
 Mujhe ${numQuestions} multiple choice questions (MCQs) chahiye is topic pe: "${subject}${topic ? ' - ' + topic : ''}".
@@ -31,11 +35,12 @@ Response EXACTLY is JSON format mein do:
   }
 ]`;
 
-  const result = await model.generateContent(prompt);
-  const responseText = result.response.text();
-
-  // Gemini kabhi kabhi ```json ke andar wrap karke bhejta hai, usse clean karte hain
-  const cleanedText = responseText.replace(/```json|```/g, '').trim();
+  const result = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: prompt,
+  });
+  const responseText = result.text;
+  const cleanedText = cleanJson(responseText);
 
   try {
     const questions = JSON.parse(cleanedText);
@@ -47,8 +52,6 @@ Response EXACTLY is JSON format mein do:
 
 // Yeh function Gemini se detailed study notes (PDF ke liye content) generate karwata hai
 async function generateStudyNotes({ examCategory, subject, topic }) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
   const prompt = `Tum ek expert teacher ho ${examCategory} competitive exam preparation ke liye.
 
 Mujhe "${topic}" (${subject} subject ke andar) is topic pe detailed study notes chahiye, jo PDF banane ke liye use honge.
@@ -71,9 +74,12 @@ Response EXACTLY is JSON format mein do:
   ]
 }`;
 
-  const result = await model.generateContent(prompt);
-  const responseText = result.response.text();
-  const cleanedText = responseText.replace(/```json|```/g, '').trim();
+  const result = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: prompt,
+  });
+  const responseText = result.text;
+  const cleanedText = cleanJson(responseText);
 
   try {
     const notes = JSON.parse(cleanedText);
@@ -85,16 +91,17 @@ Response EXACTLY is JSON format mein do:
 
 // Yeh function user ke doubt/question ka answer deta hai (Flash-Lite - fast aur zyada daily limit)
 async function solveDoubt(userQuestion) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
-
   const prompt = `Tum ek helpful teacher ho jo competitive exam (SSC, Banking, Railway) students ki madad karte ho.
 
 Student ka sawal: "${userQuestion}"
 
 Simple, clear aur exam-focused jawab do. Agar calculation hai to step by step samjhao. Zyada lamba mat likhna, seedha point pe aao.`;
 
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+  const result = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-lite',
+    contents: prompt,
+  });
+  return result.text;
 }
 
 module.exports = { generateTestQuestions, generateStudyNotes, solveDoubt };
