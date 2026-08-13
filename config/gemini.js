@@ -123,25 +123,35 @@ async function generateStudyNotes({ examCategory, subject, topic, customPrompt }
     ? customPrompt
     : `Create COMPLETE, EXAM-READY study notes on "${topic}" (${subject} subject) for ${examCategory} exam preparation. Include: core concept/theory, important formulas/rules, at least 3 solved examples with step-by-step solutions, common mistakes students make, and 5 practice questions (without answers) at the end.`;
 
-  const prompt = `You are an expert ${examCategory} exam content writer preparing a PDF study document.
+  const prompt = `You are an expert ${examCategory} exam content writer preparing a PDF study document for students. You must follow the instruction below EXACTLY - do not add anything the instruction didn't ask for, and do not skip anything it did ask for.
 
 Topic: "${topic}" (Subject: ${subject})
 
-What to create:
+INSTRUCTION TO FOLLOW EXACTLY:
+"""
 ${contentInstruction}
+"""
 
-Formatting rules:
-- Organize the content into clearly headed sections
-- Highlight formulas clearly in the text (e.g. "Formula: ...")
-- Return ONLY valid JSON, no extra text, no markdown formatting (no \`\`\`)
+STRICT CONTENT RULES:
+- Follow the instruction above precisely. If it asks for a formula sheet only, give ONLY formulas - no unrelated intro paragraphs, no extra sections it didn't ask for.
+- This is study material for a PDF document, NOT a programming/coding document. NEVER write code blocks, code snippets, pseudocode, or programming syntax (no \`\`\`, no function definitions, no variable assignments like "x = 5") anywhere in the content, even for math - write math and formulas in plain readable text (e.g. "Speed = Distance / Time", not code).
+- Do not go off-topic or add generic filler content, trivia, or "did you know" tangents that were not requested.
+- Do not mention or reference searching the internet, external websites, or being an AI - write as a subject-matter expert directly.
+- Every fact, formula and example must be accurate and directly relevant to "${topic}" in ${subject} for ${examCategory}.
+- Write in plain text paragraphs and bullet points only. Use \\n\\n between paragraphs and \\n- for bullet points within the "content" string of each section.
+- Each section's "content" must be substantive (not just one line) unless the instruction explicitly asks for something brief.
+
+OUTPUT FORMAT RULES:
+- Organize the content into clearly headed sections that match what the instruction asked for.
+- Return ONLY valid JSON. No text before or after the JSON. No markdown code fences (no \`\`\`json or \`\`\`).
 
 Respond in EXACTLY this JSON format:
 {
-  "title": "A short title for this document",
+  "title": "A short, specific title for this document",
   "sections": [
     {
       "heading": "Section name",
-      "content": "Section's detailed content here (plain text, use \\n\\n for paragraphs, \\n- for bullet points)"
+      "content": "Section's detailed content here (plain text only, use \\n\\n for paragraphs, \\n- for bullet points, no code blocks)"
     }
   ]
 }`;
@@ -153,12 +163,22 @@ Respond in EXACTLY this JSON format:
   const responseText = result.text;
   const cleanedText = cleanJson(responseText);
 
+  let notes;
   try {
-    const notes = JSON.parse(cleanedText);
-    return notes;
+    notes = JSON.parse(cleanedText);
   } catch (error) {
     throw new Error('AI response ko samajhne mein error aayi, dubara try karo');
   }
+
+  // Safety net: agar AI ne bhi kabhi code-block jaisa content de diya (```), use PDF ke liye clean karo
+  if (notes.sections && Array.isArray(notes.sections)) {
+    notes.sections = notes.sections.map((s) => ({
+      ...s,
+      content: (s.content || '').replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, ''),
+    }));
+  }
+
+  return notes;
 }
 
 // Yeh function user ke doubt/question ka answer deta hai (Flash-Lite - fast aur zyada daily limit)
