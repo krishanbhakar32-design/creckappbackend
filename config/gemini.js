@@ -12,21 +12,26 @@ function cleanJson(text) {
 
 // Yeh function Gemini ko command bhejta hai aur MCQ questions banwata hai
 async function generateTestQuestions({ examCategory, subject, topic, numQuestions, difficulty }) {
-  const prompt = `Tum ek expert exam content creator ho ${examCategory} competitive exam ke liye.
+  const prompt = `You are a senior question-setter who has authored official ${examCategory} exam papers and analyzed the last 10 years of ${examCategory} Previous Year Question papers (PYQs).
 
-Mujhe ${numQuestions} multiple choice questions (MCQs) chahiye is topic pe: "${subject}${topic ? ' - ' + topic : ''}".
-Difficulty level: ${difficulty || 'medium'}.
+Generate ${numQuestions} multiple choice questions for: "${subject}${topic ? ' - ' + topic : ''}".
+Target difficulty: ${difficulty || 'medium'}.
 
-Rules:
-- Har question exact ${examCategory} exam pattern jaisa hona chahiye
-- Har question ke 4 options hone chahiye
-- Sirf ek hi sahi answer ho
-- Har question ke saath ek chhota explanation do ki sahi jawab kyu sahi hai
-- Numerical questions mein calculation double-check karna, galti nahi honi chahiye
-- HAR question, options aur explanation dono English AUR Hindi mein do (jaisa asli SSC/Banking/Railway exams mein bilingual papers hote hain). Hindi translation natural aur exam-appropriate honi chahiye, word-by-word literal nahi.
-- Sirf valid JSON return karo, koi extra text nahi, koi markdown formatting nahi (no \`\`\`)
+CRITICAL ACCURACY RULES (follow strictly):
+- Base every question on the actual style, phrasing and difficulty seen in real ${examCategory} PYQs from the last 10 years. Do not invent trivial or off-syllabus questions.
+- Before writing correctAnswerIndex, mentally SOLVE the question step by step yourself, exactly as it would be solved in the official answer key, and double, triple check the arithmetic/logic. The correctAnswerIndex MUST match your own worked solution, not a guess.
+- For numerical/quant questions: show correct calculation logic in your head first, verify the final number is exactly one of the 4 options, THEN write the question.
+- Difficulty must be genuinely ${difficulty || 'medium'}:
+  - "easy" = a below-average PYQ-level question, still exam-standard, not a trivial school-level question.
+  - "medium" = a typical PYQ-level question of average difficulty for ${examCategory}.
+  - "hard" = a PYQ-level question from the tougher end of the paper (multi-step, tricky distractors), the kind that only strong candidates solve confidently within the per-question time limit.
+- Distractor options (wrong answers) must be plausible "common mistake" values, not random or obviously wrong.
+- Every question needs exactly 4 options and exactly one correct answer.
+- Include a short explanation showing the correct solution method.
+- Give EVERY question, its options and explanation in BOTH English AND Hindi (like real bilingual SSC/Banking/Railway papers). Hindi must be natural and exam-appropriate, not a literal word-by-word translation.
+- Return ONLY valid JSON, no extra text, no markdown formatting (no \`\`\`)
 
-Response EXACTLY is JSON format mein do:
+Respond in EXACTLY this JSON format:
 [
   {
     "questionText": "question in English",
@@ -62,23 +67,25 @@ async function generateFullMockTest({ examCategory, subCategory, sections, diffi
     .map((s, i) => `${i + 1}. ${s.name} — ${s.numQuestions} questions`)
     .join('\n');
 
-  const prompt = `Tum ek expert exam content creator ho ${examCategory}${subCategory ? ' ' + subCategory : ''} competitive exam ke liye.
+  const prompt = `You are a senior question-setter who has authored official ${examCategory}${subCategory ? ' ' + subCategory : ''} exam papers and analyzed the last 10 years of ${examCategory} Previous Year Question papers (PYQs).
 
-Mujhe ek COMPLETE full-length mock test chahiye, jisme ye sections hon (isi order mein):
+Generate a COMPLETE full-length mock test with these sections (in this exact order):
 ${sectionsList}
 
-Difficulty level: ${difficulty || 'medium'}.
+Target difficulty: ${difficulty || 'medium'}.
 
-Rules:
-- Har section ke exact utne hi questions banao jitne bataye gaye hain, sections isi order mein hone chahiye
-- Har question exact ${examCategory} exam pattern jaisa hona chahiye, us section ke subject se related
-- Har question ke 4 options hone chahiye, sirf ek hi sahi answer ho
-- Har question ke saath ek chhota explanation do
-- Numerical questions mein calculation double-check karna
-- HAR question, options aur explanation dono English AUR Hindi mein do (jaisa asli bilingual exam papers hote hain). Hindi translation natural honi chahiye.
-- Sirf valid JSON return karo, koi extra text nahi, koi markdown formatting nahi (no \`\`\`)
+CRITICAL ACCURACY RULES (follow strictly):
+- Generate exactly the stated number of questions per section, in the given order.
+- Base every question on the actual style, phrasing and difficulty seen in real ${examCategory}${subCategory ? ' ' + subCategory : ''} PYQs from the last 10 years, matching that section's subject.
+- Before writing correctAnswerIndex, mentally SOLVE the question step by step yourself, exactly as it would be solved in the official answer key, and double, triple check the arithmetic/logic. The correctAnswerIndex MUST match your own worked solution, not a guess.
+- For numerical/quant questions: verify your calculated answer is exactly one of the 4 options before finalizing the question.
+- Difficulty must be genuinely ${difficulty || 'medium'} — a real PYQ-level question for ${examCategory}, not a simplified or trivial version. "hard" means the tough end of the real paper (multi-step, tricky distractors).
+- Distractor options must be plausible "common mistake" values, not random or obviously wrong.
+- Include a short explanation showing the correct solution method.
+- Give EVERY question, its options and explanation in BOTH English AND Hindi (like real bilingual exam papers). Hindi must be natural and exam-appropriate, not literal word-by-word translation.
+- Return ONLY valid JSON, no extra text, no markdown formatting (no \`\`\`)
 
-Response EXACTLY is JSON format mein do (ek single flat array, sections ke order mein questions):
+Respond in EXACTLY this JSON format (a single flat array, questions in section order):
 [
   {
     "questionText": "question in English",
@@ -88,7 +95,7 @@ Response EXACTLY is JSON format mein do (ek single flat array, sections ke order
     "correctAnswerIndex": 0,
     "explanation": "explanation in English",
     "explanationHi": "explanation ka Hindi translation",
-    "sectionName": "us section ka naam jisse ye question belong karta hai"
+    "sectionName": "the section name this question belongs to"
   }
 ]`;
 
