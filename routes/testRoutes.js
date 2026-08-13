@@ -11,7 +11,16 @@ const {
   submitTest,
   getTestSummary,
   getExamPatterns,
+  getMyAttempts,
+  deleteTest,
+  getCutoffs,
 } = require('../controllers/testController');
+
+router.get('/cutoffs', getCutoffs); // Expected category-wise cutoffs (result page ke liye)
+
+router.delete('/:id', protect, adminOnly, deleteTest); // Admin test delete kare
+
+router.get('/my-attempts', protect, getMyAttempts); // User ki apni attempt history (dashboard ke liye)
 
 router.get('/patterns', getExamPatterns); // Real exam patterns (SSC/Banking/Railway ke sections/timing/marking)
 
