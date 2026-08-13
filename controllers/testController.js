@@ -3,10 +3,28 @@ const Test = require('../models/Test');
 const TestAttempt = require('../models/TestAttempt');
 const { generateTestQuestions, generateFullMockTest } = require('../config/gemini');
 const examPatterns = require('../config/examPatterns');
+const cutoffs = require('../config/cutoffs');
+
+// USER: Apni attempt history dekhna (dashboard ke liye)
+exports.getMyAttempts = async (req, res) => {
+  try {
+    const attempts = await TestAttempt.find({ user: req.user.id })
+      .populate('test', 'title examCategory subject testType')
+      .sort({ attemptedAt: -1 });
+    res.json(attempts);
+  } catch (error) {
+    res.status(500).json({ message: 'Attempts laane mein error aayi', error: error.message });
+  }
+};
 
 // PUBLIC/ADMIN: Real exam patterns (SSC/Banking/Railway ke official section/timing/marking) bhejna
 exports.getExamPatterns = (req, res) => {
   res.json(examPatterns);
+};
+
+// PUBLIC: Expected category-wise cutoffs bhejna (result page ke liye, reference values)
+exports.getCutoffs = (req, res) => {
+  res.json(cutoffs);
 };
 
 // ADMIN: AI se naya test generate karna (sirf review ke liye, abhi publish nahi hota)
@@ -132,6 +150,17 @@ exports.getTestSummary = async (req, res) => {
 };
 
 // USER: Sab tests ki list dekhna (filter ke saath)
+// ADMIN: Ek test delete karna
+exports.deleteTest = async (req, res) => {
+  try {
+    const test = await Test.findByIdAndDelete(req.params.id);
+    if (!test) return res.status(404).json({ message: 'Test nahi mila' });
+    res.json({ message: 'Test delete ho gaya' });
+  } catch (error) {
+    res.status(500).json({ message: 'Delete karne mein error aayi', error: error.message });
+  }
+};
+
 exports.getTests = async (req, res) => {
   try {
     const { examCategory, subCategory, testType, subject, topic } = req.query;
@@ -181,14 +210,36 @@ exports.submitTest = async (req, res) => {
     let wrongCount = 0;
     let unattemptedCount = 0;
 
+    // Subject/section ke hisaab se breakdown bhi track karte hain (jaise "Maths: 8/10 correct")
+    const breakdownMap = {}; // { sectionName: { correct, wrong, unattempted, total } }
+
+    const getGroupName = (question, index) => {
+      // full-mock tests mein question.sectionName hota hai; sectional/topic-wise mein test.subject use karo
+      if (question.sectionName) return question.sectionName;
+      if (test.sections && test.sections.length > 0) {
+        const sec = test.sections.find((s) => index >= s.questionStartIndex && index < s.questionEndIndex);
+        if (sec) return sec.name;
+      }
+      return test.subject || 'General';
+    };
+
     test.questions.forEach((question, index) => {
+      const groupName = getGroupName(question, index);
+      if (!breakdownMap[groupName]) {
+        breakdownMap[groupName] = { correct: 0, wrong: 0, unattempted: 0, total: 0 };
+      }
+      breakdownMap[groupName].total++;
+
       const userAnswer = answers.find((a) => a.questionIndex === index);
       if (!userAnswer || userAnswer.selectedOptionIndex === null || userAnswer.selectedOptionIndex === undefined) {
         unattemptedCount++;
+        breakdownMap[groupName].unattempted++;
       } else if (userAnswer.selectedOptionIndex === question.correctAnswerIndex) {
         correctCount++;
+        breakdownMap[groupName].correct++;
       } else {
         wrongCount++;
+        breakdownMap[groupName].wrong++;
       }
     });
 
@@ -197,6 +248,13 @@ exports.submitTest = async (req, res) => {
     const correctMarks = test.correctMarks || 1;
     const negativeMarks = test.negativeMarks || 0;
     const score = Number((correctCount * correctMarks - wrongCount * negativeMarks).toFixed(2));
+
+    const subjectBreakdown = Object.entries(breakdownMap).map(([name, stats]) => ({
+      subject: name,
+      ...stats,
+      marks: Number((stats.correct * correctMarks - stats.wrong * negativeMarks).toFixed(2)),
+      maxMarks: Number((stats.total * correctMarks).toFixed(2)),
+    }));
 
     const attempt = await TestAttempt.create({
       user: req.user.id,
@@ -210,9 +268,11 @@ exports.submitTest = async (req, res) => {
       timeTakenSeconds,
     });
 
-    // Result ke saath sahi answers aur explanation bhi bhej do ab
+    // Result ke saath sahi answers, explanation, aur subject-wise breakdown bhi bhej do ab
     res.json({
       attempt,
+      subjectBreakdown,
+      maxMarks: Number((test.questions.length * correctMarks).toFixed(2)),
       correctAnswers: test.questions.map((q) => ({
         correctAnswerIndex: q.correctAnswerIndex,
         explanation: q.explanation,
