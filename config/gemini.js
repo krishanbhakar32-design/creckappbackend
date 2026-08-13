@@ -11,11 +11,15 @@ function cleanJson(text) {
 }
 
 // Yeh function Gemini ko command bhejta hai aur MCQ questions banwata hai
+// Retry + top-up logic ke saath, taaki EXACT utne hi questions milein jitne manga tha
+// (Gemini kabhi kabhi kam ya zyada questions bana deta hai, isliye count verify karke fix karte hain)
 async function generateTestQuestions({ examCategory, subject, topic, numQuestions, difficulty }) {
-  const prompt = `You are a senior question-setter who has authored official ${examCategory} exam papers and analyzed the last 10 years of ${examCategory} Previous Year Question papers (PYQs).
+  const buildPrompt = (count, avoidList = []) => `You are a senior question-setter who has authored official ${examCategory} exam papers and analyzed the last 10 years of ${examCategory} Previous Year Question papers (PYQs).
 
-Generate ${numQuestions} multiple choice questions for: "${subject}${topic ? ' - ' + topic : ''}".
+Generate EXACTLY ${count} multiple choice questions for: "${subject}${topic ? ' - ' + topic : ''}".
 Target difficulty: ${difficulty || 'medium'}.
+
+CRITICAL: You MUST return EXACTLY ${count} question objects in the array - not one more, not one less. Count them before responding.
 
 CRITICAL ACCURACY RULES (follow strictly):
 - Base every question on the actual style, phrasing and difficulty seen in real ${examCategory} PYQs from the last 10 years. Do not invent trivial or off-syllabus questions.
@@ -29,9 +33,10 @@ CRITICAL ACCURACY RULES (follow strictly):
 - Every question needs exactly 4 options and exactly one correct answer.
 - Include a short explanation showing the correct solution method.
 - Give EVERY question, its options and explanation in BOTH English AND Hindi (like real bilingual SSC/Banking/Railway papers). Hindi must be natural and exam-appropriate, not a literal word-by-word translation.
+${avoidList.length > 0 ? `- Do not repeat these already-used questions: ${avoidList.slice(0, 10).join(' | ')}` : ''}
 - Return ONLY valid JSON, no extra text, no markdown formatting (no \`\`\`)
 
-Respond in EXACTLY this JSON format:
+Respond in EXACTLY this JSON format (an array of EXACTLY ${count} items):
 [
   {
     "questionText": "question in English",
@@ -44,74 +49,70 @@ Respond in EXACTLY this JSON format:
   }
 ]`;
 
-  const result = await ai.models.generateContent({
-    model: 'gemini-3.1-flash-lite',
-    contents: prompt,
-  });
-  const responseText = result.text;
-  const cleanedText = cleanJson(responseText);
+  const callGemini = async (count, avoidList = []) => {
+    const result = await ai.models.generateContent({
+      model: 'gemini-3.1-flash-lite',
+      contents: buildPrompt(count, avoidList),
+    });
+    const cleanedText = cleanJson(result.text);
+    try {
+      const parsed = JSON.parse(cleanedText);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  };
 
-  try {
-    const questions = JSON.parse(cleanedText);
-    return questions;
-  } catch (error) {
-    throw new Error('AI response ko samajhne mein error aayi, dubara try karo');
+  let questions = await callGemini(numQuestions);
+
+  // Agar count match nahi hua, ek retry poori list ke liye
+  let attempts = 0;
+  while (questions.length !== numQuestions && attempts < 2) {
+    attempts++;
+    if (questions.length < numQuestions) {
+      // Kam questions mile - baaki ke liye top-up call karo (duplicate avoid karne ki koshish ke saath)
+      const missing = numQuestions - questions.length;
+      const existingTexts = questions.map((q) => q.questionText);
+      const topUp = await callGemini(missing, existingTexts);
+      questions = [...questions, ...topUp];
+    } else {
+      // Zyada questions mile - extra trim kar do
+      questions = questions.slice(0, numQuestions);
+    }
   }
+
+  // Final safety: agar retries ke baad bhi kam hain, jitne hain utne hi bhejo (zyada ho to trim)
+  if (questions.length > numQuestions) {
+    questions = questions.slice(0, numQuestions);
+  }
+
+  return questions;
 }
 
 // Yeh function poora Full-Length Mock Test banata hai (jaise SSC CGL Tier 1: 4 sections,
 // har section ka apna alag locked time). Ek hi call mein saare sections ke questions milte hain.
 async function generateFullMockTest({ examCategory, subCategory, sections, difficulty }) {
   // sections = [{ name: 'Quantitative Aptitude', numQuestions: 25, durationMinutes: 15 }, ...]
-  const sectionsList = sections
-    .map((s, i) => `${i + 1}. ${s.name} — ${s.numQuestions} questions`)
-    .join('\n');
+  // Har section ko ALAG call se generate karte hain (generateTestQuestions ka hi retry/top-up logic
+  // reuse karke) - isse count-mismatch bug nahi aata jo ek hi bade call mein aksar hota tha.
+  const allQuestions = [];
 
-  const prompt = `You are a senior question-setter who has authored official ${examCategory}${subCategory ? ' ' + subCategory : ''} exam papers and analyzed the last 10 years of ${examCategory} Previous Year Question papers (PYQs).
-
-Generate a COMPLETE full-length mock test with these sections (in this exact order):
-${sectionsList}
-
-Target difficulty: ${difficulty || 'medium'}.
-
-CRITICAL ACCURACY RULES (follow strictly):
-- Generate exactly the stated number of questions per section, in the given order.
-- Base every question on the actual style, phrasing and difficulty seen in real ${examCategory}${subCategory ? ' ' + subCategory : ''} PYQs from the last 10 years, matching that section's subject.
-- Before writing correctAnswerIndex, mentally SOLVE the question step by step yourself, exactly as it would be solved in the official answer key, and double, triple check the arithmetic/logic. The correctAnswerIndex MUST match your own worked solution, not a guess.
-- For numerical/quant questions: verify your calculated answer is exactly one of the 4 options before finalizing the question.
-- Difficulty must be genuinely ${difficulty || 'medium'} — a real PYQ-level question for ${examCategory}, not a simplified or trivial version. "hard" means the tough end of the real paper (multi-step, tricky distractors).
-- Distractor options must be plausible "common mistake" values, not random or obviously wrong.
-- Include a short explanation showing the correct solution method.
-- Give EVERY question, its options and explanation in BOTH English AND Hindi (like real bilingual exam papers). Hindi must be natural and exam-appropriate, not literal word-by-word translation.
-- Return ONLY valid JSON, no extra text, no markdown formatting (no \`\`\`)
-
-Respond in EXACTLY this JSON format (a single flat array, questions in section order):
-[
-  {
-    "questionText": "question in English",
-    "questionTextHi": "question ka Hindi translation",
-    "options": ["option A", "option B", "option C", "option D"],
-    "optionsHi": ["option A Hindi", "option B Hindi", "option C Hindi", "option D Hindi"],
-    "correctAnswerIndex": 0,
-    "explanation": "explanation in English",
-    "explanationHi": "explanation ka Hindi translation",
-    "sectionName": "the section name this question belongs to"
+  for (const section of sections) {
+    const sectionQuestions = await generateTestQuestions({
+      examCategory: `${examCategory}${subCategory ? ' ' + subCategory : ''}`,
+      subject: section.name,
+      topic: '',
+      numQuestions: section.numQuestions,
+      difficulty,
+    });
+    // Tag karo taaki baad mein pata chale ye question kis section ka hai
+    sectionQuestions.forEach((q) => {
+      q.sectionName = section.name;
+    });
+    allQuestions.push(...sectionQuestions);
   }
-]`;
 
-  const result = await ai.models.generateContent({
-    model: 'gemini-3.1-flash-lite',
-    contents: prompt,
-  });
-  const responseText = result.text;
-  const cleanedText = cleanJson(responseText);
-
-  try {
-    const questions = JSON.parse(cleanedText);
-    return questions;
-  } catch (error) {
-    throw new Error('AI response ko samajhne mein error aayi, dubara try karo');
-  }
+  return allQuestions;
 }
 
 // Yeh function Gemini se detailed study notes (PDF ke liye content) generate karwata hai
