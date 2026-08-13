@@ -115,32 +115,32 @@ Respond in EXACTLY this JSON format (a single flat array, questions in section o
 }
 
 // Yeh function Gemini se detailed study notes (PDF ke liye content) generate karwata hai
-async function generateStudyNotes({ examCategory, subject, topic }) {
-  const prompt = `Tum ek expert teacher ho ${examCategory} competitive exam preparation ke liye, jinhe pichle 10 saal ka exam pattern pata hai.
+async function generateStudyNotes({ examCategory, subject, topic, customPrompt }) {
+  // Agar admin ne apna khud ka prompt diya hai, to uska content-instruction seedha use karo -
+  // koi forced intro/structure nahi thopte, admin jo maange wahi banega.
+  const contentInstruction = customPrompt
+    ? customPrompt
+    : `Create COMPLETE, EXAM-READY study notes on "${topic}" (${subject} subject) for ${examCategory} exam preparation. Include: core concept/theory, important formulas/rules, at least 3 solved examples with step-by-step solutions, common mistakes students make, and 5 practice questions (without answers) at the end.`;
 
-Mujhe "${topic}" (${subject} subject ke andar) is topic pe COMPLETE, EXAM-READY study notes chahiye, jo ek professional PDF banane ke liye use honge.
+  const prompt = `You are an expert ${examCategory} exam content writer preparing a PDF study document.
 
-Structure follow karo:
-1. Ek chhota intro paragraph (topic kyu important hai exam ke liye)
-2. Core concept/theory (clear, simple language mein)
-3. Important formulas/rules (agar applicable ho) — bullet points mein
-4. Kam se kam 3 solved examples, step-by-step solution ke saath
-5. Common mistakes jo students karte hain
-6. 5 practice questions (bina answer ke, sirf practice ke liye) end mein
+Topic: "${topic}" (Subject: ${subject})
 
-Rules:
-- Exam-focused rakho, bahut lamba-chauda generic theory nahi
-- Har section clear heading ke saath ho
-- Formulas ko clearly highlight karo text mein (jaise "Formula: ...")
-- Sirf valid JSON return karo, koi extra text nahi, koi markdown formatting nahi (no \`\`\`)
+What to create:
+${contentInstruction}
 
-Response EXACTLY is JSON format mein do:
+Formatting rules:
+- Organize the content into clearly headed sections
+- Highlight formulas clearly in the text (e.g. "Formula: ...")
+- Return ONLY valid JSON, no extra text, no markdown formatting (no \`\`\`)
+
+Respond in EXACTLY this JSON format:
 {
-  "title": "Topic ka naam",
+  "title": "A short title for this document",
   "sections": [
     {
-      "heading": "Section ka naam",
-      "content": "Section ka detailed content yaha (plain text, paragraphs ke liye \\n\\n use karo, bullet points ke liye \\n- use karo)"
+      "heading": "Section name",
+      "content": "Section's detailed content here (plain text, use \\n\\n for paragraphs, \\n- for bullet points)"
     }
   ]
 }`;
