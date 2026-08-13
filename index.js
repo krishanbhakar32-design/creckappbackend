@@ -47,6 +47,7 @@ app.use('/api/tests', require('./routes/testRoutes'));
 app.use('/api/pdfs', require('./routes/pdfRoutes'));
 app.use('/api/doubt', require('./routes/doubtRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
+app.use('/api/leaderboard', require('./routes/leaderboardRoutes'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
