@@ -9,9 +9,13 @@ const { createPdfFromNotes } = require('../config/pdfGenerator');
 exports.generateNotes = async (req, res) => {
   try {
     const { examCategory, subject, topic, customPrompt } = req.body;
+    if (!examCategory || !subject || !topic) {
+      return res.status(400).json({ message: 'Exam category, subject aur topic teeno zaroori hain' });
+    }
     const notes = await generateStudyNotes({ examCategory, subject, topic, customPrompt });
     res.json({ examCategory, subject, topic, notes });
   } catch (error) {
+    console.error('PDF notes generation error:', error);
     res.status(500).json({ message: 'Notes generate karne mein error aayi', error: error.message });
   }
 };
@@ -21,7 +25,14 @@ exports.publishNotes = async (req, res) => {
   try {
     const { examCategory, subject, topic, notes } = req.body;
 
-    const filename = `${topic.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+    if (!notes || !notes.title || !Array.isArray(notes.sections) || notes.sections.length === 0) {
+      return res.status(400).json({ message: 'Notes data missing ya galat format mein hai. Pehle Generate karo.' });
+    }
+
+    // Safe filename banate hain - topic ya title, jo bhi mile, undefined pe crash na ho
+    const safeBase = (topic || notes.title || 'notes').toString().replace(/[^a-zA-Z0-9]+/g, '_');
+    const filename = `${safeBase}_${Date.now()}.pdf`;
+
     const fileUrl = await createPdfFromNotes(notes, filename, { examCategory, subject, topic });
 
     const studyPdf = await StudyPdf.create({
@@ -34,6 +45,7 @@ exports.publishNotes = async (req, res) => {
 
     res.status(201).json({ message: 'PDF publish ho gaya!', studyPdf });
   } catch (error) {
+    console.error('PDF publish error:', error);
     res.status(500).json({ message: 'Publish karne mein error aayi', error: error.message });
   }
 };
