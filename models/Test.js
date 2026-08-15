@@ -44,7 +44,7 @@ const testSchema = new mongoose.Schema({
   },
   examCategory: {
     type: String,
-    required: true, // jaise "SSC", "Banking", "Railway"
+    required: true, // jaise "SSC", "IBPS", "RRB"
   },
   subCategory: {
     type: String, // jaise "SSC CGL", "SSC CHSL"
@@ -73,6 +73,11 @@ const testSchema = new mongoose.Schema({
         durationMinutes: { type: Number, required: true }, // is section ka locked time
         questionStartIndex: { type: Number, required: true }, // questions array mein kaha se shuru
         questionEndIndex: { type: Number, required: true }, // kaha khatam (exclusive)
+        // Optional override: agar is section ka marking test-level marking se alag ho
+        // (jaise SSC MTS Session 1 mein negative marking hi nahi hoti). Agar nahi diya
+        // gaya to test.correctMarks/negativeMarks use hota hai.
+        correctMarks: { type: Number, default: null },
+        negativeMarks: { type: Number, default: null },
       },
     ],
     default: [],
@@ -81,7 +86,7 @@ const testSchema = new mongoose.Schema({
     type: Number,
     required: true, // sectional tests ke liye yeh 15 rahega (jaisa decide hua); full-mock+sections ke liye yeh sabhi section durations ka total hoga
   },
-  // Marking scheme - real exam ke pattern ke hisaab se (jaise SSC: +2/-0.5, IBPS: +1/-0.25, Railway: +1/-0.33)
+  // Marking scheme - real exam ke pattern ke hisaab se (jaise SSC: +2/-0.5, IBPS: +1/-0.25, RRB: +1/-0.33)
   correctMarks: {
     type: Number,
     default: 1,
