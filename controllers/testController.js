@@ -17,7 +17,7 @@ exports.getMyAttempts = async (req, res) => {
   }
 };
 
-// PUBLIC/ADMIN: Real exam patterns (SSC/Banking/Railway ke official section/timing/marking) bhejna
+// PUBLIC/ADMIN: Real exam patterns (SSC/IBPS/RRB ke official section/timing/marking) bhejna
 exports.getExamPatterns = (req, res) => {
   res.json(examPatterns);
 };
@@ -95,6 +95,10 @@ exports.generateFullMock = async (req, res) => {
         durationMinutes: s.durationMinutes,
         questionStartIndex: startIndex,
         questionEndIndex: endIndex,
+        // Agar frontend ne is section ke liye alag marking bheji hai (jaise SSC MTS ke sessions),
+        // use yahan save karo taaki scoring time pe use ho
+        correctMarks: s.correctMarks ?? null,
+        negativeMarks: s.negativeMarks ?? null,
       };
     });
 
@@ -206,29 +210,42 @@ exports.submitTest = async (req, res) => {
     const test = await Test.findById(testId);
     if (!test) return res.status(404).json({ message: 'Test nahi mila' });
 
+    // Subject/section ke hisaab se breakdown bhi track karte hain (jaise "Maths: 8/10 correct")
+    const breakdownMap = {}; // { sectionName: { correct, wrong, unattempted, total, correctMarks, negativeMarks } }
+
+    const getSection = (question, index) => {
+      // full-mock tests mein question.sectionName hota hai; test.sections se poora section object milta hai
+      if (test.sections && test.sections.length > 0) {
+        const byIndex = test.sections.find((s) => index >= s.questionStartIndex && index < s.questionEndIndex);
+        if (byIndex) return byIndex;
+        if (question.sectionName) {
+          const byName = test.sections.find((s) => s.name === question.sectionName);
+          if (byName) return byName;
+        }
+      }
+      return null;
+    };
+
+    const defaultCorrectMarks = test.correctMarks || 1;
+    const defaultNegativeMarks = test.negativeMarks || 0;
+
     let correctCount = 0;
     let wrongCount = 0;
     let unattemptedCount = 0;
-
-    // Subject/section ke hisaab se breakdown bhi track karte hain (jaise "Maths: 8/10 correct")
-    const breakdownMap = {}; // { sectionName: { correct, wrong, unattempted, total } }
-
-    const getGroupName = (question, index) => {
-      // full-mock tests mein question.sectionName hota hai; sectional/topic-wise mein test.subject use karo
-      if (question.sectionName) return question.sectionName;
-      if (test.sections && test.sections.length > 0) {
-        const sec = test.sections.find((s) => index >= s.questionStartIndex && index < s.questionEndIndex);
-        if (sec) return sec.name;
-      }
-      return test.subject || 'General';
-    };
+    let score = 0;
 
     test.questions.forEach((question, index) => {
-      const groupName = getGroupName(question, index);
+      const section = getSection(question, index);
+      const groupName = section ? section.name : question.sectionName || test.subject || 'General';
+      // Per-section marking override agar diya gaya ho (jaise SSC MTS ke sessions), warna test-level default
+      const qCorrectMarks = section?.correctMarks ?? defaultCorrectMarks;
+      const qNegativeMarks = section?.negativeMarks ?? defaultNegativeMarks;
+
       if (!breakdownMap[groupName]) {
-        breakdownMap[groupName] = { correct: 0, wrong: 0, unattempted: 0, total: 0 };
+        breakdownMap[groupName] = { correct: 0, wrong: 0, unattempted: 0, total: 0, marks: 0, maxMarks: 0 };
       }
       breakdownMap[groupName].total++;
+      breakdownMap[groupName].maxMarks += qCorrectMarks;
 
       const userAnswer = answers.find((a) => a.questionIndex === index);
       if (!userAnswer || userAnswer.selectedOptionIndex === null || userAnswer.selectedOptionIndex === undefined) {
@@ -236,24 +253,35 @@ exports.submitTest = async (req, res) => {
         breakdownMap[groupName].unattempted++;
       } else if (userAnswer.selectedOptionIndex === question.correctAnswerIndex) {
         correctCount++;
+        score += qCorrectMarks;
         breakdownMap[groupName].correct++;
+        breakdownMap[groupName].marks += qCorrectMarks;
       } else {
         wrongCount++;
+        score -= qNegativeMarks;
         breakdownMap[groupName].wrong++;
+        breakdownMap[groupName].marks -= qNegativeMarks;
       }
     });
 
-    // Real exam jaisa scoring: sahi jawab ke marks, galat jawab pe negative marking
-    // (test.correctMarks aur test.negativeMarks se aata hai, jo exam pattern se set hote hain)
-    const correctMarks = test.correctMarks || 1;
-    const negativeMarks = test.negativeMarks || 0;
-    const score = Number((correctCount * correctMarks - wrongCount * negativeMarks).toFixed(2));
+    score = Number(score.toFixed(2));
+    const maxMarks = Number(
+      test.questions
+        .reduce((sum, q, i) => {
+          const section = getSection(q, i);
+          return sum + (section?.correctMarks ?? defaultCorrectMarks);
+        }, 0)
+        .toFixed(2)
+    );
 
     const subjectBreakdown = Object.entries(breakdownMap).map(([name, stats]) => ({
       subject: name,
-      ...stats,
-      marks: Number((stats.correct * correctMarks - stats.wrong * negativeMarks).toFixed(2)),
-      maxMarks: Number((stats.total * correctMarks).toFixed(2)),
+      correct: stats.correct,
+      wrong: stats.wrong,
+      unattempted: stats.unattempted,
+      total: stats.total,
+      marks: Number(stats.marks.toFixed(2)),
+      maxMarks: Number(stats.maxMarks.toFixed(2)),
     }));
 
     const attempt = await TestAttempt.create({
@@ -272,7 +300,7 @@ exports.submitTest = async (req, res) => {
     res.json({
       attempt,
       subjectBreakdown,
-      maxMarks: Number((test.questions.length * correctMarks).toFixed(2)),
+      maxMarks,
       correctAnswers: test.questions.map((q) => ({
         correctAnswerIndex: q.correctAnswerIndex,
         explanation: q.explanation,
